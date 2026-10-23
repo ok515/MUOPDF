@@ -9,7 +9,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:screenOrientation="unspecified">
+            android:screenOrientation="unspecified"
+            android:windowLayoutInDisplayCutoutMode="shortEdges">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
