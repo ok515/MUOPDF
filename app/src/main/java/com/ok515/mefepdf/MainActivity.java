@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
     private boolean controlsVisible = true;
     private int pageIndex = 0;
     private Uri currentUri;
-    private String currentName = "لم يتم فتح ملف";
+    private String currentName = tr("لم يتم فتح ملف", "No file opened", "Aucun fichier ouvert");
     private Bitmap currentBitmap;
     private boolean readerMode = false;
     private boolean darkMode = false;
@@ -58,6 +58,13 @@ public class MainActivity extends Activity {
     private int primary = Color.rgb(82, 103, 217);
     private int background, surface, foreground, secondaryText, pageBackground;
     private SharedPreferences prefs;
+
+    private String tr(String ar, String en, String fr) {
+        String lang = java.util.Locale.getDefault().getLanguage();
+        if ("ar".equals(lang)) return ar;
+        if ("fr".equals(lang)) return fr;
+        return en;
+    }
 
     private int dp(float n) {
         return (int)(n * getResources().getDisplayMetrics().density + 0.5f);
@@ -189,12 +196,7 @@ public class MainActivity extends Activity {
         root.setGravity(Gravity.CENTER);
         root.setBackgroundColor(background);
 
-        TextView brand = label("Simple PDF", 27, foreground);
-        brand.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-        brand.setGravity(Gravity.CENTER);
-        root.addView(brand, new LinearLayout.LayoutParams(-1, -2));
-
-        MaterialButton open = button("＋  فتح ملف PDF", true);
+        MaterialButton open = button(tr("＋  فتح ملف PDF", "＋  Open PDF file", "＋  Ouvrir un fichier PDF"), true);
         LinearLayout.LayoutParams op = new LinearLayout.LayoutParams(-1, dp(54));
         op.topMargin = dp(24);
         root.addView(open, op);
@@ -203,7 +205,7 @@ public class MainActivity extends Activity {
         String lastUri = prefs.getString("last_uri", null);
         String lastName = prefs.getString("last_name", null);
         if (lastUri != null && lastName != null) {
-            MaterialButton resume = button("متابعة القراءة", false);
+            MaterialButton resume = button(tr("متابعة القراءة", "Continue reading", "Reprendre la lecture"), false);
             LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(48));
             rp.topMargin = dp(12);
             root.addView(resume, rp);
@@ -234,7 +236,7 @@ public class MainActivity extends Activity {
                     Intent.FLAG_GRANT_READ_URI_PERMISSION);
         } catch (Exception ignored) {}
         String name = uri.getLastPathSegment();
-        if (name == null || name.trim().isEmpty()) name = "ملف PDF";
+        if (name == null || name.trim().isEmpty()) name = tr("ملف PDF", "PDF file", "Fichier PDF");
         openPdf(uri, name);
     }
 
@@ -245,7 +247,7 @@ public class MainActivity extends Activity {
             currentName = name;
 
             InputStream in = getContentResolver().openInputStream(uri);
-            if (in == null) throw new Exception("تعذر قراءة الملف");
+            if (in == null) throw new Exception(tr("تعذر قراءة الملف", "Unable to read the file", "Impossible de lire le fichier"));
 
             File f = new File(getCacheDir(), "reader-current.pdf");
             try (FileOutputStream out = new FileOutputStream(f)) {
@@ -269,11 +271,11 @@ public class MainActivity extends Activity {
             buildReader();
             showPage(pageIndex);
         } catch (OutOfMemoryError e) {
-            Toast.makeText(this, "الملف كبير جدًا للذاكرة المتاحة",
+            Toast.makeText(this, tr("الملف كبير جدًا للذاكرة المتاحة", "The file is too large for available memory", "Le fichier est trop volumineux pour la mémoire disponible"),
                     Toast.LENGTH_LONG).show();
             buildHome();
         } catch (Exception e) {
-            Toast.makeText(this, "تعذر فتح الملف: " + e.getMessage(),
+            Toast.makeText(this, tr("تعذر فتح الملف: ", "Could not open file: ", "Impossible d’ouvrir le fichier : ") + e.getMessage(),
                     Toast.LENGTH_LONG).show();
             buildHome();
         }
@@ -311,7 +313,7 @@ public class MainActivity extends Activity {
             favorite = !favorite;
             prefs.edit().putBoolean("fav_" + currentUri.toString(), favorite).apply();
             fav.setText(favorite ? "★" : "☆");
-            Toast.makeText(this, favorite ? "أُضيف للمفضلة" : "أُزيل من المفضلة",
+            Toast.makeText(this, favorite ? tr("أُضيف للمفضلة", "Added to favorites", "Ajouté aux favoris") : tr("أُزيل من المفضلة", "Removed from favorites", "Retiré des favoris"),
                     Toast.LENGTH_SHORT).show();
         });
         root.addView(top);
@@ -324,8 +326,8 @@ public class MainActivity extends Activity {
 
         LinearLayout nav = row();
         readerNav = nav;
-        MaterialButton prev = button("السابق", false);
-        MaterialButton next = button("التالي", true);
+        MaterialButton prev = button(tr("السابق", "Previous", "Précédent"), false);
+        MaterialButton next = button(tr("التالي", "Next", "Suivant"), true);
         pageInfo = label("— / —", 14, foreground);
         pageInfo.setGravity(Gravity.CENTER);
 
@@ -337,7 +339,7 @@ public class MainActivity extends Activity {
         LinearLayout zoom = row();
         readerZoom = zoom;
         MaterialButton minus = button("−", false);
-        MaterialButton fit = button("ملاءمة الصفحة", false);
+        MaterialButton fit = button(tr("ملاءمة الصفحة", "Fit page", "Ajuster à la page"), false);
         MaterialButton plus = button("+", false);
         zoom.addView(minus, new LinearLayout.LayoutParams(0, dp(46), 1));
         zoom.addView(fit, new LinearLayout.LayoutParams(0, dp(46), 2));
@@ -421,10 +423,10 @@ public class MainActivity extends Activity {
             }
             savePage();
         } catch (OutOfMemoryError e) {
-            Toast.makeText(this, "الصفحة أكبر من الذاكرة المتاحة",
+            Toast.makeText(this, tr("الصفحة أكبر من الذاكرة المتاحة", "Page is too large for available memory", "La page dépasse la mémoire disponible"),
                     Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            Toast.makeText(this, "تعذر عرض الصفحة", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, tr("تعذر عرض الصفحة", "Unable to display page", "Impossible d’afficher la page"), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -452,6 +454,8 @@ public class MainActivity extends Activity {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        darkMode = (newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
         applyColors();
         getWindow().setStatusBarColor(background);
         getWindow().setNavigationBarColor(background);
