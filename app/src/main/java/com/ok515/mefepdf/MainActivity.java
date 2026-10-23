@@ -220,8 +220,15 @@ public class MainActivity extends Activity {
 
         LinearLayout.LayoutParams emailParams =
                 new LinearLayout.LayoutParams(-1, dp(44));
-        emailParams.topMargin = dp(16);
+        emailParams.topMargin = 0;
+        emailParams.gravity = Gravity.TOP;
         root.addView(email, emailParams);
+
+        root.post(() -> {
+            int targetY = (int) (root.getHeight() * 0.60f);
+            int currentY = email.getTop();
+            email.setTranslationY(targetY - currentY);
+        });
         email.setOnClickListener(v -> openSupportEmail());
 
         setContentView(root);
