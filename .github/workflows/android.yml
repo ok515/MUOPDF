@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -53,9 +53,15 @@ jobs:
           test -s "$APK"
           jarsigner -verify "$APK"
 
-      - name: Upload Release APK
-        uses: actions/upload-artifact@v4
+      - name: Prepare direct APK
+        run: cp app/build/outputs/apk/release/app-release.apk MUOAPK.apk
+
+      - name: Publish direct APK download
+        uses: softprops/action-gh-release@v2
         with:
-          name: MUO
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
+          tag_name: latest
+          name: Latest MUOAPK
+          body: "Download and install MUOAPK.apk."
+          files: MUOAPK.apk
+          overwrite_files: true
+          make_latest: true

@@ -591,6 +591,15 @@ public class MainActivity extends Activity {
                     (float) getHeight() / bitmap.getHeight());
         }
 
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            super.onSizeChanged(w, h, oldw, oldh);
+            if (w > 0 && h > 0 && (w != oldw || h != oldh)) {
+                clampOffsets();
+                invalidate();
+            }
+        }
+
         void changeZoom(float factor) {
             float oldZoom = zoom;
             float newZoom = Math.max(1f, Math.min(MAX_ZOOM, zoom * factor));
