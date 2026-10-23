@@ -44,6 +44,8 @@ public class MainActivity extends Activity {
     private PdfPageView pageView;
     private LinearLayout root;
     private TextView pageInfo, fileTitle;
+    private LinearLayout readerTop, readerNav, readerZoom;
+    private boolean controlsVisible = true;
     private int pageIndex = 0;
     private Uri currentUri;
     private String currentName = "لم يتم فتح ملف";
@@ -157,122 +159,42 @@ public class MainActivity extends Activity {
         readerMode = false;
         root = column();
         root.setPadding(dp(20), dp(18), dp(20), dp(16));
+        root.setGravity(Gravity.CENTER);
         root.setBackgroundColor(background);
-
-        LinearLayout header = row();
-        LinearLayout brandBox = column();
 
         TextView brand = label("Simple PDF", 27, foreground);
         brand.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-        brandBox.addView(brand);
-        brandBox.addView(label("مساحة هادئة للقراءة", 13, secondaryText));
-        header.addView(brandBox, new LinearLayout.LayoutParams(0, -2, 1));
+        brand.setGravity(Gravity.CENTER);
+        root.addView(brand, new LinearLayout.LayoutParams(-1, -2));
 
-        MaterialButton theme = button(darkMode ? "☀" : "☾", false);
-        header.addView(theme, new LinearLayout.LayoutParams(dp(52), dp(48)));
+        MaterialButton open = button("＋  فتح ملف PDF", true);
+        LinearLayout.LayoutParams op = new LinearLayout.LayoutParams(-1, dp(54));
+        op.topMargin = dp(24);
+        root.addView(open, op);
+        open.setOnClickListener(v -> choosePdf());
+
+        String lastUri = prefs.getString("last_uri", null);
+        String lastName = prefs.getString("last_name", null);
+        if (lastUri != null && lastName != null) {
+            MaterialButton resume = button("متابعة القراءة", false);
+            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(48));
+            rp.topMargin = dp(12);
+            root.addView(resume, rp);
+            resume.setOnClickListener(v -> openPdf(Uri.parse(lastUri), lastName));
+        }
+
+        MaterialButton theme = button(darkMode ? "☀  المظهر" : "☾  المظهر", false);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, dp(46));
+        tp.topMargin = dp(12);
+        root.addView(theme, tp);
         theme.setOnClickListener(v -> {
             darkMode = !darkMode;
             prefs.edit().putBoolean("dark", darkMode).apply();
             applyColors();
             buildHome();
         });
-        root.addView(header);
 
-        TextView welcome = label("اقرأ كتبك براحتك", 22, foreground);
-        welcome.setTypeface(Typeface.DEFAULT_BOLD);
-        LinearLayout.LayoutParams welcomeP = new LinearLayout.LayoutParams(
-                -1, -2);
-        welcomeP.topMargin = dp(28);
-        root.addView(welcome, welcomeP);
-        root.addView(label("كل ملفات PDF في مكان واحد.", 14, secondaryText));
-
-        MaterialCardView hero = card();
-        LinearLayout heroInside = column();
-        heroInside.setPadding(dp(20), dp(22), dp(20), dp(20));
-
-        TextView icon = label("▤", 38, primary);
-        heroInside.addView(icon);
-
-        TextView heroTitle = label("ابدأ القراءة", 21, foreground);
-        heroTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        LinearLayout.LayoutParams ht = new LinearLayout.LayoutParams(-1, -2);
-        ht.topMargin = dp(10);
-        heroInside.addView(heroTitle, ht);
-
-        TextView heroSub = label(
-                "افتح كتابًا أو مستندًا من هاتفك، واقرأه في واجهة بسيطة ومريحة.",
-                14, secondaryText);
-        heroSub.setGravity(Gravity.TOP);
-        heroSub.setPadding(0, dp(6), 0, dp(16));
-        heroInside.addView(heroSub);
-
-        MaterialButton open = button("＋   فتح ملف PDF", true);
-        heroInside.addView(open, new LinearLayout.LayoutParams(-1, dp(52)));
-        open.setOnClickListener(v -> choosePdf());
-
-        hero.addView(heroInside);
-        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
-        hp.topMargin = dp(22);
-        root.addView(hero, hp);
-
-        LinearLayout recentHeader = row();
-        TextView recentTitle = label("متابعة القراءة", 18, foreground);
-        recentTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        recentHeader.addView(recentTitle, new LinearLayout.LayoutParams(0, -2, 1));
-        MaterialButton browse = button("فتح ملف", false);
-        recentHeader.addView(browse);
-        browse.setOnClickListener(v -> choosePdf());
-
-        LinearLayout.LayoutParams rh = new LinearLayout.LayoutParams(-1, -2);
-        rh.topMargin = dp(26);
-        root.addView(recentHeader, rh);
-
-        String lastUri = prefs.getString("last_uri", null);
-        String lastName = prefs.getString("last_name", null);
-        if (lastUri != null && lastName != null) {
-            MaterialCardView recent = card();
-            LinearLayout inside = row();
-            inside.setPadding(dp(14), dp(12), dp(14), dp(12));
-            TextView docIcon = label("▤", 28, primary);
-            inside.addView(docIcon, new LinearLayout.LayoutParams(dp(44), dp(48)));
-
-            LinearLayout meta = column();
-            meta.addView(label(lastName, 14, foreground));
-            meta.addView(label("آخر ملف مفتوح", 12, secondaryText));
-            inside.addView(meta, new LinearLayout.LayoutParams(0, -2, 1));
-
-            MaterialButton resume = button("فتح", true);
-            inside.addView(resume);
-            resume.setOnClickListener(v -> {
-                try {
-                    openPdf(Uri.parse(lastUri), lastName);
-                } catch (Exception e) {
-                    Toast.makeText(this, "اختر الملف من جديد", Toast.LENGTH_SHORT).show();
-                    choosePdf();
-                }
-            });
-            recent.addView(inside);
-            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
-            rp.topMargin = dp(10);
-            root.addView(recent, rp);
-        } else {
-            TextView empty = label("مازال ما فتحت حتى ملف. ابدأ بفتح PDF.", 13,
-                    secondaryText);
-            LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2);
-            ep.topMargin = dp(12);
-            root.addView(empty, ep);
-        }
-
-        TextView privacy = label("ملفاتك تبقى على جهازك", 12, secondaryText);
-        privacy.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, dp(40));
-        pp.topMargin = dp(12);
-        root.addView(privacy, pp);
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.addView(root);
-        setContentView(scroll);
+        setContentView(root);
     }
 
     private void choosePdf() {
@@ -348,6 +270,7 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(background);
 
         LinearLayout top = row();
+        readerTop = top;
         MaterialButton back = button("‹", false);
         top.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
         back.setOnClickListener(v -> {
@@ -379,6 +302,7 @@ public class MainActivity extends Activity {
         root.addView(pageView, vp);
 
         LinearLayout nav = row();
+        readerNav = nav;
         MaterialButton prev = button("السابق", false);
         MaterialButton next = button("التالي", true);
         pageInfo = label("— / —", 14, foreground);
@@ -390,6 +314,7 @@ public class MainActivity extends Activity {
         root.addView(nav);
 
         LinearLayout zoom = row();
+        readerZoom = zoom;
         MaterialButton minus = button("−", false);
         MaterialButton fit = button("ملاءمة الصفحة", false);
         MaterialButton plus = button("+", false);
@@ -405,6 +330,24 @@ public class MainActivity extends Activity {
         fit.setOnClickListener(v -> pageView.resetZoom());
 
         setContentView(root);
+        controlsVisible = true;
+        updateReaderControls();
+        pageView.setOnClickListener(v -> {
+            controlsVisible = !controlsVisible;
+            updateReaderControls();
+        });
+    }
+
+    private void updateReaderControls() {
+        boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        int visibility = (landscape && !controlsVisible) ? View.GONE : View.VISIBLE;
+        if (readerTop != null) readerTop.setVisibility(visibility);
+        if (readerNav != null) readerNav.setVisibility(visibility);
+        if (readerZoom != null) readerZoom.setVisibility(visibility);
+        if (root != null) root.setPadding(
+                dp(landscape ? 4 : 12), dp(landscape ? 4 : 8),
+                dp(landscape ? 4 : 12), dp(landscape ? 4 : 8));
     }
 
     private void showPage(int index) {
@@ -469,6 +412,7 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(background);
 
         if (readerMode) {
+            controlsVisible = newConfig.orientation != Configuration.ORIENTATION_LANDSCAPE;
             buildReader();
             if (currentBitmap != null && !currentBitmap.isRecycled()) {
                 pageView.setBitmap(currentBitmap);
