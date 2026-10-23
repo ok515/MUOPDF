@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme"
         android:label="Simple PDF Reader"
         android:allowBackup="false"
@@ -10,7 +12,7 @@
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:screenOrientation="unspecified"
-            android:windowLayoutInDisplayCutoutMode="shortEdges">
+            android:windowLayoutInDisplayCutoutMode="always">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
