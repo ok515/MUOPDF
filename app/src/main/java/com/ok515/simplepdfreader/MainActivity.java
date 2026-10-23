@@ -2,6 +2,7 @@ package com.ok515.simplepdfreader;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Build;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
@@ -68,6 +69,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("reader_prefs", MODE_PRIVATE);
         darkMode = prefs.getBoolean("dark", false);
         applyColors();
+        applyDisplayCutoutMode();
 
         getWindow().setStatusBarColor(background);
         getWindow().setNavigationBarColor(background);
@@ -78,6 +80,20 @@ public class MainActivity extends Activity {
         );
 
         buildHome();
+    }
+
+    private void applyDisplayCutoutMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams params = getWindow().getAttributes();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+            } else {
+                params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            }
+            getWindow().setAttributes(params);
+        }
     }
 
     private void applyColors() {
@@ -157,6 +173,17 @@ public class MainActivity extends Activity {
 
     private void buildHome() {
         readerMode = false;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(true);
+        }
+        getWindow().setStatusBarColor(background);
+        getWindow().setNavigationBarColor(background);
+        getWindow().getDecorView().setSystemUiVisibility(
+                darkMode ? 0 :
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR |
+                View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        );
         root = column();
         root.setPadding(dp(20), dp(18), dp(20), dp(16));
         root.setGravity(Gravity.CENTER);
@@ -265,6 +292,11 @@ public class MainActivity extends Activity {
 
     private void buildReader() {
         readerMode = true;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+        }
+        applyDisplayCutoutMode();
         root = column();
         root.setPadding(dp(12), dp(8), dp(12), dp(8));
         root.setBackgroundColor(background);
@@ -363,6 +395,14 @@ public class MainActivity extends Activity {
                     | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }
 
+        applyDisplayCutoutMode();
+        if (immersive) {
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+            getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        } else {
+            getWindow().setStatusBarColor(background);
+            getWindow().setNavigationBarColor(background);
+        }
         getWindow().getDecorView().setSystemUiVisibility(flags);
     }
 
