@@ -341,13 +341,35 @@ public class MainActivity extends Activity {
     private void updateReaderControls() {
         boolean landscape = getResources().getConfiguration().orientation
                 == Configuration.ORIENTATION_LANDSCAPE;
-        int visibility = (landscape && !controlsVisible) ? View.GONE : View.VISIBLE;
+        boolean immersive = landscape && !controlsVisible;
+
+        int visibility = immersive ? View.GONE : View.VISIBLE;
         if (readerTop != null) readerTop.setVisibility(visibility);
         if (readerNav != null) readerNav.setVisibility(visibility);
         if (readerZoom != null) readerZoom.setVisibility(visibility);
-        if (root != null) root.setPadding(
-                dp(landscape ? 4 : 12), dp(landscape ? 4 : 8),
-                dp(landscape ? 4 : 12), dp(landscape ? 4 : 8));
+
+        int pad = landscape ? 0 : dp(12);
+        int verticalPad = landscape ? 0 : dp(8);
+        if (root != null) {
+            root.setPadding(pad, verticalPad, pad, verticalPad);
+        }
+
+        if (immersive) {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            );
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    darkMode ? 0 :
+                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                    | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            );
+        }
     }
 
     private void showPage(int index) {
