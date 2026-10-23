@@ -334,28 +334,11 @@ public class MainActivity extends Activity {
 
         LinearLayout top = row();
         readerTop = top;
-        MaterialButton back = button("‹", false);
-        top.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        back.setOnClickListener(v -> {
-            savePage();
-            buildHome();
-        });
-
         fileTitle = label(currentName, 14, foreground);
         fileTitle.setMaxLines(1);
         fileTitle.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         fileTitle.setPadding(dp(10), 0, dp(10), 0);
-        top.addView(fileTitle, new LinearLayout.LayoutParams(0, -2, 1));
-
-        MaterialButton fav = button(favorite ? "★" : "☆", false);
-        top.addView(fav, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        fav.setOnClickListener(v -> {
-            favorite = !favorite;
-            prefs.edit().putBoolean("fav_" + currentUri.toString(), favorite).apply();
-            fav.setText(favorite ? "★" : "☆");
-            Toast.makeText(this, favorite ? tr("أُضيف للمفضلة", "Added to favorites", "Ajouté aux favoris") : tr("أُزيل من المفضلة", "Removed from favorites", "Retiré des favoris"),
-                    Toast.LENGTH_SHORT).show();
-        });
+        top.addView(fileTitle, new LinearLayout.LayoutParams(-1, -2));
         root.addView(top);
 
         pageView = new PdfPageView();
