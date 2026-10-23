@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.ok515.simplepdfreader'
+    namespace 'com.ok515.mefepdf'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.ok515.simplepdfreader'
+        applicationId 'com.ok515.mefepdf'
         minSdk 23
         targetSdk 35
         versionCode 4

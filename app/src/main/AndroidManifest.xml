@@ -3,14 +3,14 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme"
-        android:label="Simple PDF Reader"
+        android:label="Mefé PDF"
         android:allowBackup="false"
         android:supportsRtl="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:screenOrientation="unspecified"
             android:windowLayoutInDisplayCutoutMode="always">
 
