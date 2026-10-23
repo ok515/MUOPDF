@@ -500,35 +500,44 @@ public class MainActivity extends Activity {
 
     private class PdfPageView extends View {
         private Bitmap bitmap;
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Paint paint = new Paint(
+                Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final ScaleGestureDetector detector;
         private float zoom = 1f;
-        private float offsetX = 0f, offsetY = 0f;
+        private float offsetX, offsetY;
         private float lastX, lastY, downX, downY;
-        private boolean moved;
+        private boolean moved, multiTouch;
+        private static final float MAX_ZOOM = 12f;
+        private static final float TOUCH_SLOP = 12f;
 
         PdfPageView() {
             super(MainActivity.this);
             setClickable(true);
+
             detector = new ScaleGestureDetector(MainActivity.this,
                     new ScaleGestureDetector.SimpleOnScaleGestureListener() {
                 @Override
                 public boolean onScale(ScaleGestureDetector d) {
                     float oldZoom = zoom;
-                    float newZoom = Math.max(1f, Math.min(6f,
+                    float newZoom = Math.max(1f, Math.min(MAX_ZOOM,
                             oldZoom * d.getScaleFactor()));
+
                     float fx = d.getFocusX();
                     float fy = d.getFocusY();
+                    float cx = getWidth() / 2f;
+                    float cy = getHeight() / 2f;
                     float ratio = newZoom / oldZoom;
 
-                    offsetX = fx - (fx - offsetX) * ratio;
-                    offsetY = fy - (fy - offsetY) * ratio;
+                    // Keep the PDF point beneath the fingers anchored.
+                    offsetX = (fx - cx) - ((fx - cx) - offsetX) * ratio;
+                    offsetY = (fy - cy) - ((fy - cy) - offsetY) * ratio;
                     zoom = newZoom;
 
                     if (zoom <= 1.001f) {
                         zoom = 1f;
                         offsetX = offsetY = 0f;
                     }
+
                     clampOffsets();
                     invalidate();
                     return true;
@@ -542,20 +551,21 @@ public class MainActivity extends Activity {
         }
 
         private float fitScale() {
-            if (bitmap == null || getWidth() == 0 || getHeight() == 0) return 1f;
+            if (bitmap == null || getWidth() == 0 || getHeight() == 0) {
+                return 1f;
+            }
             return Math.min((float) getWidth() / bitmap.getWidth(),
                     (float) getHeight() / bitmap.getHeight());
         }
 
         void changeZoom(float factor) {
             float oldZoom = zoom;
-            float newZoom = Math.max(1f, Math.min(6f, zoom * factor));
-            float fx = getWidth() / 2f;
-            float fy = getHeight() / 2f;
+            float newZoom = Math.max(1f, Math.min(MAX_ZOOM, zoom * factor));
             float ratio = newZoom / oldZoom;
 
-            offsetX = fx - (fx - offsetX) * ratio;
-            offsetY = fy - (fy - offsetY) * ratio;
+            // Button zoom is centered and does not jump toward a corner.
+            offsetX *= ratio;
+            offsetY *= ratio;
             zoom = newZoom;
 
             if (zoom == 1f) offsetX = offsetY = 0f;
@@ -575,14 +585,11 @@ public class MainActivity extends Activity {
             float scale = fitScale() * zoom;
             float w = bitmap.getWidth() * scale;
             float h = bitmap.getHeight() * scale;
+            float limitX = Math.max(0f, (w - getWidth()) / 2f);
+            float limitY = Math.max(0f, (h - getHeight()) / 2f);
 
-            float minX = Math.min(0f, getWidth() - w);
-            float maxX = Math.max(0f, getWidth() - w);
-            float minY = Math.min(0f, getHeight() - h);
-            float maxY = Math.max(0f, getHeight() - h);
-
-            offsetX = Math.max(minX, Math.min(maxX, offsetX));
-            offsetY = Math.max(minY, Math.min(maxY, offsetY));
+            offsetX = Math.max(-limitX, Math.min(limitX, offsetX));
+            offsetY = Math.max(-limitY, Math.min(limitY, offsetY));
         }
 
         @Override
@@ -610,23 +617,31 @@ public class MainActivity extends Activity {
 
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    lastX = downX = e.getX();
-                    lastY = downY = e.getY();
+                    downX = lastX = e.getX();
+                    downY = lastY = e.getY();
                     moved = false;
+                    multiTouch = false;
                     return true;
 
                 case MotionEvent.ACTION_POINTER_DOWN:
+                    multiTouch = true;
                     moved = true;
                     return true;
 
                 case MotionEvent.ACTION_MOVE:
-                    if (Math.abs(e.getX() - downX) > 12 ||
-                            Math.abs(e.getY() - downY) > 12) moved = true;
+                    float dx = e.getX() - lastX;
+                    float dy = e.getY() - lastY;
 
+                    if (Math.abs(e.getX() - downX) > TOUCH_SLOP ||
+                            Math.abs(e.getY() - downY) > TOUCH_SLOP) {
+                        moved = true;
+                    }
+
+                    // One-finger pan is reserved for zoomed pages.
                     if (e.getPointerCount() == 1 &&
-                            !detector.isInProgress() && zoom > 1f) {
-                        offsetX += e.getX() - lastX;
-                        offsetY += e.getY() - lastY;
+                            !detector.isInProgress() && zoom > 1.001f) {
+                        offsetX += dx;
+                        offsetY += dy;
                         clampOffsets();
                         invalidate();
                     }
@@ -636,11 +651,22 @@ public class MainActivity extends Activity {
                     return true;
 
                 case MotionEvent.ACTION_POINTER_UP:
+                    multiTouch = true;
                     moved = true;
                     return true;
 
                 case MotionEvent.ACTION_UP:
-                    if (!moved && !detector.isInProgress()) performClick();
+                    float totalX = e.getX() - downX;
+                    float totalY = e.getY() - downY;
+
+                    if (!moved && !multiTouch && !detector.isInProgress()) {
+                        performClick();
+                    } else if (!multiTouch && zoom <= 1.001f &&
+                            Math.abs(totalX) > dp(65) &&
+                            Math.abs(totalX) > Math.abs(totalY) * 1.25f) {
+                        if (totalX < 0) showPage(pageIndex + 1);
+                        else showPage(pageIndex - 1);
+                    }
                     return true;
 
                 case MotionEvent.ACTION_CANCEL:
