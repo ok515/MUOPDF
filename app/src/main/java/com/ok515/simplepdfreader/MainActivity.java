@@ -3,38 +3,58 @@ package com.ok515.simplepdfreader;
 import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.pdf.PdfRenderer;
 import android.os.ParcelFileDescriptor;
 import android.view.Gravity;
 import android.view.View;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
+import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.graphics.Typeface;
+
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.color.DynamicColors;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends Activity {
     private static final int PICK_PDF = 100;
+
     private PdfRenderer renderer;
     private ParcelFileDescriptor descriptor;
     private PdfPageView pageView;
-    private TextView pageInfo, fileTitle, hint;
+    private LinearLayout root;
+    private TextView pageInfo, fileTitle;
     private int pageIndex = 0;
     private Uri currentUri;
     private String currentName = "لم يتم فتح ملف";
-    private final int navy = Color.rgb(24, 43, 70);
-    private final int teal = Color.rgb(16, 126, 137);
-    private final int bg = Color.rgb(241, 245, 249);
+    private Bitmap currentBitmap;
+    private boolean readerMode = false;
+    private boolean darkMode = false;
+    private boolean favorite = false;
+
+    private int primary = Color.rgb(82, 103, 217);
+    private int background, surface, foreground, secondaryText, pageBackground;
+    private SharedPreferences prefs;
 
     private int dp(float n) {
         return (int)(n * getResources().getDisplayMetrics().density + 0.5f);
@@ -43,111 +63,224 @@ public class MainActivity extends Activity {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(navy);
-        getWindow().setNavigationBarColor(navy);
-        buildUI();
+        prefs = getSharedPreferences("reader_prefs", MODE_PRIVATE);
+        darkMode = prefs.getBoolean("dark", false);
+        applyColors();
+
+        getWindow().setStatusBarColor(background);
+        getWindow().setNavigationBarColor(background);
+        getWindow().getDecorView().setSystemUiVisibility(
+                darkMode ? 0 :
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR |
+                View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        );
+
+        buildHome();
     }
 
-    private TextView text(String value, int size, int color) {
+    private void applyColors() {
+        if (darkMode) {
+            background = Color.rgb(18, 19, 24);
+            surface = Color.rgb( thirty(), thirty(), 38);
+            foreground = Color.rgb(239, 240, 250);
+            secondaryText = Color.rgb(177, 181, 199);
+            pageBackground = Color.rgb(35, 37, 45);
+        } else {
+            background = Color.rgb(247, 247, 255);
+            surface = Color.WHITE;
+            foreground = Color.rgb(30, 32, 47);
+            secondaryText = Color.rgb(105, 109, 129);
+            pageBackground = Color.rgb(230, 233, 243);
+        }
+    }
+
+    private int thirty() { return 30; }
+
+    private TextView label(String value, int size, int color) {
         TextView t = new TextView(this);
         t.setText(value);
         t.setTextSize(size);
         t.setTextColor(color);
+        t.setGravity(Gravity.CENTER_VERTICAL);
         return t;
     }
 
-    private Button button(String value) {
-        Button b = new Button(this);
+    private MaterialButton button(String value, boolean filled) {
+        MaterialButton b = new MaterialButton(this);
         b.setText(value);
         b.setTextSize(14);
         b.setAllCaps(false);
+        b.setCornerRadius(dp(18));
+        b.setInsetTop(0);
+        b.setInsetBottom(0);
+        if (filled) {
+            b.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(primary));
+            b.setTextColor(Color.WHITE);
+        } else {
+            b.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(surface));
+            b.setTextColor(foreground);
+            b.setStrokeColor(android.content.res.ColorStateList.valueOf(
+                    darkMode ? Color.rgb(65, 67, 82) :
+                            Color.rgb(224, 226, 239)));
+            b.setStrokeWidth(dp(1));
+        }
         return b;
     }
 
-    private void buildUI() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(12), dp(8), dp(12), dp(8));
-        root.setBackgroundColor(bg);
+    private MaterialCardView card() {
+        MaterialCardView c = new MaterialCardView(this);
+        c.setRadius(dp(24));
+        c.setCardElevation(0);
+        c.setCardBackgroundColor(surface);
+        c.setStrokeWidth(dp(1));
+        c.setStrokeColor(darkMode ? Color.rgb(55, 57, 70) :
+                Color.rgb(232, 233, 245));
+        return c;
+    }
 
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(4), dp(5), dp(4), dp(12));
+    private LinearLayout column() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        return l;
+    }
 
-        TextView logo = text("▤", 32, teal);
-        header.addView(logo);
+    private LinearLayout row() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.HORIZONTAL);
+        l.setGravity(Gravity.CENTER_VERTICAL);
+        return l;
+    }
 
-        LinearLayout titles = new LinearLayout(this);
-        titles.setOrientation(LinearLayout.VERTICAL);
-        titles.setPadding(dp(12), 0, 0, 0);
+    private void buildHome() {
+        readerMode = false;
+        root = column();
+        root.setPadding(dp(20), dp(18), dp(20), dp(16));
+        root.setBackgroundColor(background);
 
-        TextView brand = text("Simple PDF", 22, navy);
-        brand.setTypeface(null, Typeface.BOLD);
-        titles.addView(brand);
-        titles.addView(text("اقرأ براحتك، في أي وقت", 13,
-                Color.rgb(105, 119, 137)));
-        header.addView(titles, new LinearLayout.LayoutParams(0,
-                -2, 1));
+        LinearLayout header = row();
+        LinearLayout brandBox = column();
+
+        TextView brand = label("Simple PDF", 27, foreground);
+        brand.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        brandBox.addView(brand);
+        brandBox.addView(label("مساحة هادئة للقراءة", 13, secondaryText));
+        header.addView(brandBox, new LinearLayout.LayoutParams(0, -2, 1));
+
+        MaterialButton theme = button(darkMode ? "☀" : "☾", false);
+        header.addView(theme, new LinearLayout.LayoutParams(dp(52), dp(48)));
+        theme.setOnClickListener(v -> {
+            darkMode = !darkMode;
+            prefs.edit().putBoolean("dark", darkMode).apply();
+            applyColors();
+            buildHome();
+        });
         root.addView(header);
 
-        Button open = button("＋   فتح ملف PDF");
-        open.setTextColor(Color.WHITE);
-        open.setBackgroundTintList(android.content.res.ColorStateList.valueOf(teal));
+        TextView welcome = label("اقرأ كتبك براحتك", 22, foreground);
+        welcome.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams welcomeP = new LinearLayout.LayoutParams(
+                -1, -2);
+        welcomeP.topMargin = dp(28);
+        root.addView(welcome, welcomeP);
+        root.addView(label("كل ملفات PDF في مكان واحد.", 14, secondaryText));
+
+        MaterialCardView hero = card();
+        LinearLayout heroInside = column();
+        heroInside.setPadding(dp(20), dp(22), dp(20), dp(20));
+
+        TextView icon = label("▤", 38, primary);
+        heroInside.addView(icon);
+
+        TextView heroTitle = label("ابدأ القراءة", 21, foreground);
+        heroTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams ht = new LinearLayout.LayoutParams(-1, -2);
+        ht.topMargin = dp(10);
+        heroInside.addView(heroTitle, ht);
+
+        TextView heroSub = label(
+                "افتح كتابًا أو مستندًا من هاتفك، واقرأه في واجهة بسيطة ومريحة.",
+                14, secondaryText);
+        heroSub.setGravity(Gravity.TOP);
+        heroSub.setPadding(0, dp(6), 0, dp(16));
+        heroInside.addView(heroSub);
+
+        MaterialButton open = button("＋   فتح ملف PDF", true);
+        heroInside.addView(open, new LinearLayout.LayoutParams(-1, dp(52)));
         open.setOnClickListener(v -> choosePdf());
-        root.addView(open);
 
-        fileTitle = text(currentName, 14, navy);
-        fileTitle.setGravity(Gravity.CENTER);
-        fileTitle.setPadding(0, dp(8), 0, dp(6));
-        root.addView(fileTitle);
+        hero.addView(heroInside);
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
+        hp.topMargin = dp(22);
+        root.addView(hero, hp);
 
-        pageView = new PdfPageView();
-        pageView.setBackgroundColor(Color.rgb(226, 233, 240));
-        LinearLayout.LayoutParams pageParams = new LinearLayout.LayoutParams(
-                -1, 0, 1);
-        pageParams.setMargins(0, dp(5), 0, dp(7));
-        root.addView(pageView, pageParams);
+        LinearLayout recentHeader = row();
+        TextView recentTitle = label("متابعة القراءة", 18, foreground);
+        recentTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        recentHeader.addView(recentTitle, new LinearLayout.LayoutParams(0, -2, 1));
+        MaterialButton browse = button("فتح ملف", false);
+        recentHeader.addView(browse);
+        browse.setOnClickListener(v -> choosePdf());
 
-        hint = text("افتح كتابًا أو ملف PDF للبدء", 14,
-                Color.rgb(90, 105, 123));
-        hint.setGravity(Gravity.CENTER);
-        root.addView(hint);
+        LinearLayout.LayoutParams rh = new LinearLayout.LayoutParams(-1, -2);
+        rh.topMargin = dp(26);
+        root.addView(recentHeader, rh);
 
-        LinearLayout nav = new LinearLayout(this);
-        nav.setGravity(Gravity.CENTER);
-        Button prev = button("❮ السابق");
-        Button next = button("التالي ❯");
-        pageInfo = text("— / —", 15, navy);
-        pageInfo.setGravity(Gravity.CENTER);
-        nav.addView(prev);
-        nav.addView(pageInfo, new LinearLayout.LayoutParams(0, -2, 1));
-        nav.addView(next);
-        root.addView(nav);
+        String lastUri = prefs.getString("last_uri", null);
+        String lastName = prefs.getString("last_name", null);
+        if (lastUri != null && lastName != null) {
+            MaterialCardView recent = card();
+            LinearLayout inside = row();
+            inside.setPadding(dp(14), dp(12), dp(14), dp(12));
+            TextView docIcon = label("▤", 28, primary);
+            inside.addView(docIcon, new LinearLayout.LayoutParams(dp(44), dp(48)));
 
-        LinearLayout zoomBar = new LinearLayout(this);
-        zoomBar.setGravity(Gravity.CENTER);
-        Button minus = button("−");
-        Button reset = button("ملاءمة الشاشة");
-        Button plus = button("+");
-        zoomBar.addView(minus, new LinearLayout.LayoutParams(0, -2, 1));
-        zoomBar.addView(reset, new LinearLayout.LayoutParams(0, -2, 2));
-        zoomBar.addView(plus, new LinearLayout.LayoutParams(0, -2, 1));
-        root.addView(zoomBar);
+            LinearLayout meta = column();
+            meta.addView(label(lastName, 14, foreground));
+            meta.addView(label("آخر ملف مفتوح", 12, secondaryText));
+            inside.addView(meta, new LinearLayout.LayoutParams(0, -2, 1));
 
-        prev.setOnClickListener(v -> showPage(pageIndex - 1));
-        next.setOnClickListener(v -> showPage(pageIndex + 1));
-        minus.setOnClickListener(v -> pageView.changeZoom(0.8f));
-        plus.setOnClickListener(v -> pageView.changeZoom(1.25f));
-        reset.setOnClickListener(v -> pageView.resetZoom());
+            MaterialButton resume = button("فتح", true);
+            inside.addView(resume);
+            resume.setOnClickListener(v -> {
+                try {
+                    openPdf(Uri.parse(lastUri), lastName);
+                } catch (Exception e) {
+                    Toast.makeText(this, "اختر الملف من جديد", Toast.LENGTH_SHORT).show();
+                    choosePdf();
+                }
+            });
+            recent.addView(inside);
+            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+            rp.topMargin = dp(10);
+            root.addView(recent, rp);
+        } else {
+            TextView empty = label("مازال ما فتحت حتى ملف. ابدأ بفتح PDF.", 13,
+                    secondaryText);
+            LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2);
+            ep.topMargin = dp(12);
+            root.addView(empty, ep);
+        }
 
-        setContentView(root);
+        TextView privacy = label("ملفاتك تبقى على جهازك", 12, secondaryText);
+        privacy.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, dp(40));
+        pp.topMargin = dp(12);
+        root.addView(privacy, pp);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.addView(root);
+        setContentView(scroll);
     }
 
     private void choosePdf() {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/pdf");
-        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(i, PICK_PDF);
     }
 
@@ -156,74 +289,211 @@ public class MainActivity extends Activity {
         super.onActivityResult(request, result, data);
         if (request != PICK_PDF || result != RESULT_OK ||
                 data == null || data.getData() == null) return;
+
         Uri uri = data.getData();
+        try {
+            getContentResolver().takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Exception ignored) {}
+        String name = uri.getLastPathSegment();
+        if (name == null || name.trim().isEmpty()) name = "ملف PDF";
+        openPdf(uri, name);
+    }
+
+    private void openPdf(Uri uri, String name) {
         try {
             closePdf();
             currentUri = uri;
-            String name = uri.getLastPathSegment();
-            currentName = name == null ? "ملف PDF" : name;
-            fileTitle.setText(currentName);
+            currentName = name;
+
             InputStream in = getContentResolver().openInputStream(uri);
-            if (in == null) throw new Exception("تعذر فتح الملف");
-            File f = new File(getCacheDir(), "reader.pdf");
+            if (in == null) throw new Exception("تعذر قراءة الملف");
+
+            File f = new File(getCacheDir(), "reader-current.pdf");
             try (FileOutputStream out = new FileOutputStream(f)) {
                 byte[] buffer = new byte[16384];
                 int n;
                 while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
             }
             in.close();
+
             descriptor = ParcelFileDescriptor.open(f,
                     ParcelFileDescriptor.MODE_READ_ONLY);
             renderer = new PdfRenderer(descriptor);
-            pageIndex = 0;
-            hint.setText("");
-            showPage(0);
+            pageIndex = Math.max(0, Math.min(
+                    prefs.getInt("page_" + uri.toString(), 0),
+                    renderer.getPageCount() - 1));
+            favorite = prefs.getBoolean("fav_" + uri.toString(), false);
+            prefs.edit()
+                    .putString("last_uri", uri.toString())
+                    .putString("last_name", name)
+                    .apply();
+            buildReader();
+            showPage(pageIndex);
+        } catch (OutOfMemoryError e) {
+            Toast.makeText(this, "الملف كبير جدًا للذاكرة المتاحة",
+                    Toast.LENGTH_LONG).show();
+            buildHome();
         } catch (Exception e) {
             Toast.makeText(this, "تعذر فتح الملف: " + e.getMessage(),
                     Toast.LENGTH_LONG).show();
+            buildHome();
         }
     }
 
+    private void buildReader() {
+        readerMode = true;
+        root = column();
+        root.setPadding(dp(12), dp(8), dp(12), dp(8));
+        root.setBackgroundColor(background);
+
+        LinearLayout top = row();
+        MaterialButton back = button("‹", false);
+        top.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        back.setOnClickListener(v -> {
+            savePage();
+            buildHome();
+        });
+
+        fileTitle = label(currentName, 14, foreground);
+        fileTitle.setMaxLines(1);
+        fileTitle.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+        fileTitle.setPadding(dp(10), 0, dp(10), 0);
+        top.addView(fileTitle, new LinearLayout.LayoutParams(0, -2, 1));
+
+        MaterialButton fav = button(favorite ? "★" : "☆", false);
+        top.addView(fav, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        fav.setOnClickListener(v -> {
+            favorite = !favorite;
+            prefs.edit().putBoolean("fav_" + currentUri.toString(), favorite).apply();
+            fav.setText(favorite ? "★" : "☆");
+            Toast.makeText(this, favorite ? "أُضيف للمفضلة" : "أُزيل من المفضلة",
+                    Toast.LENGTH_SHORT).show();
+        });
+        root.addView(top);
+
+        pageView = new PdfPageView();
+        pageView.setBackgroundColor(pageBackground);
+        LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, 0, 1);
+        vp.setMargins(0, dp(8), 0, dp(8));
+        root.addView(pageView, vp);
+
+        LinearLayout nav = row();
+        MaterialButton prev = button("السابق", false);
+        MaterialButton next = button("التالي", true);
+        pageInfo = label("— / —", 14, foreground);
+        pageInfo.setGravity(Gravity.CENTER);
+
+        nav.addView(prev, new LinearLayout.LayoutParams(0, dp(48), 1));
+        nav.addView(pageInfo, new LinearLayout.LayoutParams(0, dp(48), 1));
+        nav.addView(next, new LinearLayout.LayoutParams(0, dp(48), 1));
+        root.addView(nav);
+
+        LinearLayout zoom = row();
+        MaterialButton minus = button("−", false);
+        MaterialButton fit = button("ملاءمة الصفحة", false);
+        MaterialButton plus = button("+", false);
+        zoom.addView(minus, new LinearLayout.LayoutParams(0, dp(46), 1));
+        zoom.addView(fit, new LinearLayout.LayoutParams(0, dp(46), 2));
+        zoom.addView(plus, new LinearLayout.LayoutParams(0, dp(46), 1));
+        root.addView(zoom);
+
+        prev.setOnClickListener(v -> showPage(pageIndex - 1));
+        next.setOnClickListener(v -> showPage(pageIndex + 1));
+        minus.setOnClickListener(v -> pageView.changeZoom(0.8f));
+        plus.setOnClickListener(v -> pageView.changeZoom(1.25f));
+        fit.setOnClickListener(v -> pageView.resetZoom());
+
+        setContentView(root);
+    }
+
     private void showPage(int index) {
-        if (renderer == null) {
-            Toast.makeText(this, "افتح PDF أولًا", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (index < 0 || index >= renderer.getPageCount()) return;
+        if (renderer == null || index < 0 || index >= renderer.getPageCount()) return;
+
         try (PdfRenderer.Page page = renderer.openPage(index)) {
-            int width = Math.min(1800, Math.max(1000,
-                    getResources().getDisplayMetrics().widthPixels * 2));
-            int height = Math.max(1, width * page.getHeight() / page.getWidth());
-            Bitmap bmp = Bitmap.createBitmap(width, height,
-                    Bitmap.Config.ARGB_8888);
+            int screenW = getResources().getDisplayMetrics().widthPixels;
+            int screenH = getResources().getDisplayMetrics().heightPixels;
+            int width = Math.max(900, Math.min(1600, Math.max(screenW, screenH)));
+            int height = Math.max(1,
+                    (int)((long)width * page.getHeight() / page.getWidth()));
+
+            Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             bmp.eraseColor(Color.WHITE);
-            page.render(bmp, null, null,
-                    PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+            page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+
+            if (currentBitmap != null && !currentBitmap.isRecycled()) {
+                currentBitmap.recycle();
+            }
+            currentBitmap = bmp;
             pageIndex = index;
-            pageView.setBitmap(bmp);
-            pageInfo.setText((index + 1) + " / " + renderer.getPageCount());
+
+            if (pageView != null) pageView.setBitmap(bmp);
+            if (pageInfo != null) {
+                pageInfo.setText((index + 1) + " / " + renderer.getPageCount());
+            }
+            savePage();
         } catch (OutOfMemoryError e) {
-            Toast.makeText(this, "الملف كبير جدًا للعرض بهذه الجودة",
+            Toast.makeText(this, "الصفحة أكبر من الذاكرة المتاحة",
                     Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            Toast.makeText(this, "خطأ في عرض الصفحة",
-                    Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "تعذر عرض الصفحة", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void savePage() {
+        if (currentUri != null) {
+            prefs.edit().putInt("page_" + currentUri.toString(), pageIndex).apply();
         }
     }
 
     private void closePdf() {
         if (renderer != null) {
-            renderer.close();
+            try { renderer.close(); } catch (Exception ignored) {}
             renderer = null;
         }
         if (descriptor != null) {
             try { descriptor.close(); } catch (Exception ignored) {}
             descriptor = null;
         }
+        if (currentBitmap != null && !currentBitmap.isRecycled()) {
+            currentBitmap.recycle();
+            currentBitmap = null;
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        applyColors();
+        getWindow().setStatusBarColor(background);
+        getWindow().setNavigationBarColor(background);
+
+        if (readerMode) {
+            buildReader();
+            if (currentBitmap != null && !currentBitmap.isRecycled()) {
+                pageView.setBitmap(currentBitmap);
+            }
+            if (pageInfo != null && renderer != null) {
+                pageInfo.setText((pageIndex + 1) + " / " + renderer.getPageCount());
+            }
+        } else {
+            buildHome();
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (readerMode) {
+            savePage();
+            buildHome();
+        } else {
+            super.onBackPressed();
+        }
     }
 
     @Override
     protected void onDestroy() {
+        savePage();
         closePdf();
         super.onDestroy();
     }
@@ -235,7 +505,6 @@ public class MainActivity extends Activity {
         private final ScaleGestureDetector detector;
         private float zoom = 1f;
         private float offsetX, offsetY, lastX, lastY;
-        private int pointerCount;
 
         PdfPageView() {
             super(MainActivity.this);
@@ -252,7 +521,6 @@ public class MainActivity extends Activity {
         }
 
         void setBitmap(Bitmap b) {
-            if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
             bitmap = b;
             resetZoom();
         }
@@ -272,8 +540,9 @@ public class MainActivity extends Activity {
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            canvas.drawColor(Color.rgb(226, 233, 240));
-            if (bitmap == null || bitmap.isRecycled()) return;
+            canvas.drawColor(pageBackground);
+            if (bitmap == null || bitmap.isRecycled() ||
+                    getWidth() <= 0 || getHeight() <= 0) return;
 
             float fit = Math.min((float)getWidth() / bitmap.getWidth(),
                     (float)getHeight() / bitmap.getHeight());
@@ -295,10 +564,6 @@ public class MainActivity extends Activity {
                 case MotionEvent.ACTION_DOWN:
                     lastX = e.getX();
                     lastY = e.getY();
-                    pointerCount = 1;
-                    return true;
-                case MotionEvent.ACTION_POINTER_DOWN:
-                    pointerCount++;
                     return true;
                 case MotionEvent.ACTION_MOVE:
                     if (e.getPointerCount() == 1 &&
@@ -309,9 +574,6 @@ public class MainActivity extends Activity {
                     }
                     lastX = e.getX();
                     lastY = e.getY();
-                    return true;
-                case MotionEvent.ACTION_POINTER_UP:
-                    pointerCount = Math.max(1, pointerCount - 1);
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
