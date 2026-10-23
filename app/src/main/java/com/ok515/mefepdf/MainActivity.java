@@ -212,7 +212,40 @@ public class MainActivity extends Activity {
             resume.setOnClickListener(v -> openPdf(Uri.parse(lastUri), lastName));
         }
 
+        TextView email = label("mesdh@outlook.sa", 14, primary);
+        email.setGravity(Gravity.CENTER);
+        email.setPaintFlags(email.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG);
+        email.setClickable(true);
+        email.setFocusable(true);
+
+        LinearLayout.LayoutParams emailParams =
+                new LinearLayout.LayoutParams(-1, dp(44));
+        emailParams.topMargin = dp(16);
+        root.addView(email, emailParams);
+        email.setOnClickListener(v -> openSupportEmail());
+
         setContentView(root);
+    }
+
+    private void openSupportEmail() {
+        Uri mailUri = Uri.parse("mailto:mesdh@outlook.sa");
+        Intent intent = new Intent(Intent.ACTION_SENDTO, mailUri);
+        intent.setPackage("com.google.android.gm");
+
+        try {
+            startActivity(intent);
+        } catch (android.content.ActivityNotFoundException e) {
+            intent.setPackage(null);
+            try {
+                startActivity(intent);
+            } catch (android.content.ActivityNotFoundException ex) {
+                Toast.makeText(this,
+                        tr("ماكان حتى تطبيق بريد مثبت",
+                           "No email app is installed",
+                           "Aucune application e-mail installee"),
+                        Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private void choosePdf() {
