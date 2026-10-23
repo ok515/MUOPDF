@@ -500,20 +500,36 @@ public class MainActivity extends Activity {
 
     private class PdfPageView extends View {
         private Bitmap bitmap;
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG |
-                Paint.FILTER_BITMAP_FLAG);
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final ScaleGestureDetector detector;
         private float zoom = 1f;
-        private float offsetX, offsetY, lastX, lastY;
+        private float offsetX = 0f, offsetY = 0f;
+        private float lastX, lastY, downX, downY;
+        private boolean moved;
 
         PdfPageView() {
             super(MainActivity.this);
+            setClickable(true);
             detector = new ScaleGestureDetector(MainActivity.this,
                     new ScaleGestureDetector.SimpleOnScaleGestureListener() {
                 @Override
                 public boolean onScale(ScaleGestureDetector d) {
-                    zoom = Math.max(1f, Math.min(6f,
-                            zoom * d.getScaleFactor()));
+                    float oldZoom = zoom;
+                    float newZoom = Math.max(1f, Math.min(6f,
+                            oldZoom * d.getScaleFactor()));
+                    float fx = d.getFocusX();
+                    float fy = d.getFocusY();
+                    float ratio = newZoom / oldZoom;
+
+                    offsetX = fx - (fx - offsetX) * ratio;
+                    offsetY = fy - (fy - offsetY) * ratio;
+                    zoom = newZoom;
+
+                    if (zoom <= 1.001f) {
+                        zoom = 1f;
+                        offsetX = offsetY = 0f;
+                    }
+                    clampOffsets();
                     invalidate();
                     return true;
                 }
@@ -525,59 +541,109 @@ public class MainActivity extends Activity {
             resetZoom();
         }
 
+        private float fitScale() {
+            if (bitmap == null || getWidth() == 0 || getHeight() == 0) return 1f;
+            return Math.min((float) getWidth() / bitmap.getWidth(),
+                    (float) getHeight() / bitmap.getHeight());
+        }
+
         void changeZoom(float factor) {
-            zoom = Math.max(1f, Math.min(6f, zoom * factor));
-            if (zoom == 1f) offsetX = offsetY = 0;
+            float oldZoom = zoom;
+            float newZoom = Math.max(1f, Math.min(6f, zoom * factor));
+            float fx = getWidth() / 2f;
+            float fy = getHeight() / 2f;
+            float ratio = newZoom / oldZoom;
+
+            offsetX = fx - (fx - offsetX) * ratio;
+            offsetY = fy - (fy - offsetY) * ratio;
+            zoom = newZoom;
+
+            if (zoom == 1f) offsetX = offsetY = 0f;
+            clampOffsets();
             invalidate();
         }
 
         void resetZoom() {
             zoom = 1f;
-            offsetX = offsetY = 0;
+            offsetX = offsetY = 0f;
             invalidate();
+        }
+
+        private void clampOffsets() {
+            if (bitmap == null || getWidth() <= 0 || getHeight() <= 0) return;
+
+            float scale = fitScale() * zoom;
+            float w = bitmap.getWidth() * scale;
+            float h = bitmap.getHeight() * scale;
+
+            float minX = Math.min(0f, getWidth() - w);
+            float maxX = Math.max(0f, getWidth() - w);
+            float minY = Math.min(0f, getHeight() - h);
+            float maxY = Math.max(0f, getHeight() - h);
+
+            offsetX = Math.max(minX, Math.min(maxX, offsetX));
+            offsetY = Math.max(minY, Math.min(maxY, offsetY));
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             canvas.drawColor(pageBackground);
+
             if (bitmap == null || bitmap.isRecycled() ||
                     getWidth() <= 0 || getHeight() <= 0) return;
 
-            float fit = Math.min((float)getWidth() / bitmap.getWidth(),
-                    (float)getHeight() / bitmap.getHeight());
-            float scale = fit * zoom;
+            float scale = fitScale() * zoom;
             float left = (getWidth() - bitmap.getWidth() * scale) / 2f + offsetX;
             float top = (getHeight() - bitmap.getHeight() * scale) / 2f + offsetY;
 
             canvas.save();
             canvas.translate(left, top);
             canvas.scale(scale, scale);
-            canvas.drawBitmap(bitmap, 0, 0, paint);
+            canvas.drawBitmap(bitmap, 0f, 0f, paint);
             canvas.restore();
         }
 
         @Override
         public boolean onTouchEvent(MotionEvent e) {
             detector.onTouchEvent(e);
+
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    lastX = e.getX();
-                    lastY = e.getY();
+                    lastX = downX = e.getX();
+                    lastY = downY = e.getY();
+                    moved = false;
                     return true;
+
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    moved = true;
+                    return true;
+
                 case MotionEvent.ACTION_MOVE:
+                    if (Math.abs(e.getX() - downX) > 12 ||
+                            Math.abs(e.getY() - downY) > 12) moved = true;
+
                     if (e.getPointerCount() == 1 &&
                             !detector.isInProgress() && zoom > 1f) {
                         offsetX += e.getX() - lastX;
                         offsetY += e.getY() - lastY;
+                        clampOffsets();
                         invalidate();
                     }
+
                     lastX = e.getX();
                     lastY = e.getY();
                     return true;
+
+                case MotionEvent.ACTION_POINTER_UP:
+                    moved = true;
+                    return true;
+
                 case MotionEvent.ACTION_UP:
+                    if (!moved && !detector.isInProgress()) performClick();
+                    return true;
+
                 case MotionEvent.ACTION_CANCEL:
-                    performClick();
                     return true;
             }
             return true;
@@ -589,4 +655,5 @@ public class MainActivity extends Activity {
             return true;
         }
     }
+
 }
