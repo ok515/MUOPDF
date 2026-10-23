@@ -1,4 +1,4 @@
-name: Build SimplePDFReader
+name: Build SimplePDFReader Release
 
 on:
   push:
@@ -26,15 +26,36 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "Missing KEYSTORE_BASE64 secret"; exit 1; }
+          KEYSTORE_FILE="$RUNNER_TEMP/release-key.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          test -s "$KEYSTORE_FILE"
+          echo "KEYSTORE_FILE=$KEYSTORE_FILE" >> "$GITHUB_ENV"
 
-      - name: Verify APK
-        run: test -s app/build/outputs/apk/debug/app-debug.apk
+      - name: Build signed Release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          gradle assembleRelease --no-daemon
 
-      - name: Upload APK
+      - name: Verify signed APK
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          jarsigner -verify "$APK"
+
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: SimplePDFReader-Debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: SimplePDFReader-Release-APK
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
