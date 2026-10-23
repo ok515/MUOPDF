@@ -54,14 +54,14 @@ jobs:
           jarsigner -verify "$APK"
 
       - name: Prepare direct APK
-        run: cp app/build/outputs/apk/release/app-release.apk MUOAPK.apk
+        run: cp app/build/outputs/apk/release/app-release.apk MUO.apk
 
       - name: Publish direct APK download
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest MUOAPK
-          body: "Download and install MUOAPK.apk."
-          files: MUOAPK.apk
+          body: "Download and install MUO.apk."
+          files: MUO.apk
           overwrite_files: true
           make_latest: true
