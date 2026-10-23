@@ -1,11 +1,9 @@
-# SimplePDFReader
+MUOPDF
 
-A lightweight Android PDF reader.
+A free, ad-free PDF reader. Read with your full focus.
 
-Features:
-- Open PDF files from your device
-- Navigate between pages
+- Open PDF files offline
+- Smooth page navigation
 - Pinch to zoom
 - Portrait and landscape support
-- Offline reading
-- APK built using GitHub Actions
+- No ads. Just reading.
